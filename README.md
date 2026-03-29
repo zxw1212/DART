@@ -460,18 +460,14 @@ Our code is built upon many prior projects, including but not limited to:
 
 [DNO](https://github.com/korrawe/Diffusion-Noise-Optimization), [MDM](https://github.com/GuyTevet/motion-diffusion-model), [MLD](https://github.com/ChenFengYe/motion-latent-diffusion), [FlowMDM](https://github.com/BarqueroGerman/FlowMDM), [text-to-motion](https://github.com/EricGuo5513/text-to-motion), [guided-diffusion](https://github.com/openai/guided-diffusion), [ACTOR](https://github.com/Mathux/ACTOR), [DIMOS](https://github.com/zkf1997/DIMOS)
 
-[//]: # (# License)
+# License
+* Third-party software and datasets employs their respective license. Here are some examples:
+    * Code/model/data relevant to the SMPL-X body model follows its own license.
+    * Code/model/data relevant to the AMASS dataset follows its own license.
+    * Blender and its SMPL-X add-on employ their respective license.
+    * Please check prior works listed in the acknowledgements above to see their own licenses.
 
-[//]: # (* Our code and model checkpoints employ the MIT License.)
-
-[//]: # (* Note that our code depends on third-party software and datasets that employ their respective licenses. Here are some examples:)
-
-[//]: # (    * Code/model/data relevant to the SMPL-X body model follows its own license.)
-
-[//]: # (    * Code/model/data relevant to the AMASS dataset follows its own license.)
-
-[//]: # (    * Blender and its SMPL-X add-on employ their respective license.)
-
+* The DartControl code and model are released under the **Apache 2.0 license**.
   
 # Citation
 ```
