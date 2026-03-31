@@ -172,3 +172,14 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+mld_denoiser/
+mvae/
+policy_train/
+data/hml3d_smplh/
+data/scenes/
+data/seq_data_zero_male/
+data/smplx_lockedhead_20230207/
+data/traj_test/
+data/*.json
+data/*.pkl

@@ -321,13 +321,22 @@ def rollout(text_prompt, denoiser_args, denoiser_model, vae_args, vae_model, dif
             poses = transforms.matrix_to_axis_angle(
                 torch.cat([sequence['global_orient'].reshape(-1, 1, 3, 3), sequence['body_pose']], dim=1)
             ).reshape(-1, 22 * 3)
-            poses = torch.cat([poses, torch.zeros(poses.shape[0], 99).to(dtype=poses.dtype, device=poses.device)],
-                              dim=1)
+            pose_extras = torch.zeros(poses.shape[0], 99, dtype=poses.dtype, device=poses.device)
+            full_poses = torch.cat([poses, pose_extras], dim=1)
+            num_frames = poses.shape[0]
             data_dict = {
-                'mocap_framerate': min(dataset.target_fps, 30),  # has to be greater than 30 to be loaded by blender
+                'surface_model_type': 'smplx',
+                'mocap_framerate': min(dataset.target_fps, 30),  # Blender exporter convention
+                'mocap_frame_rate': min(dataset.target_fps, 30),  # AMASS / GMR convention
                 'gender': sequence['gender'],
                 'betas': sequence['betas'][0, :10].detach().cpu().numpy(),
-                'poses': poses.detach().cpu().numpy(),
+                'num_betas': 10,
+                'poses': full_poses.detach().cpu().numpy(),
+                'root_orient': poses[:, :3].detach().cpu().numpy(),
+                'pose_body': poses[:, 3:66].detach().cpu().numpy(),
+                'pose_jaw': np.zeros((num_frames, 3), dtype=np.float32),
+                'pose_eye': np.zeros((num_frames, 6), dtype=np.float32),
+                'pose_hand': np.zeros((num_frames, 90), dtype=np.float32),
                 'trans': sequence['transl'].detach().cpu().numpy(),
             }
             with open(out_path / f'sample_{idx}_smplx.npz', 'wb') as f:
@@ -379,5 +388,4 @@ if __name__ == '__main__':
                 rollout(text_prompt, denoiser_args, denoiser_model, vae_args, vae_model, diffusion, dataset, rollout_args)
     else:
         rollout(rollout_args.text_prompt, denoiser_args, denoiser_model, vae_args, vae_model, diffusion, dataset, rollout_args)
-
 

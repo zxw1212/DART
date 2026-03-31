@@ -23,6 +23,15 @@ Setup conda env:
 conda env create -f environment.yml
 conda activate DART
 ```
+
+Alternative `venv + pip` setup:
+```
+python3.8 -m venv .venv
+source .venv/bin/activate
+bash ./install_pip_deps.sh
+```
+This pip path is useful when `conda.anaconda.org` is blocked but `pypi.org`, `download.pytorch.org`, and `github.com` are reachable. It keeps the project on Python 3.8, installs the CUDA 11.8 PyTorch wheels, and builds `pytorch3d` 0.7.5 from source. Because of that, it expects a local CUDA 11.8 toolkit (`nvcc`) in addition to the NVIDIA driver.
+
 Tested system:
 
 Our experiments and performance profiling are conducted on a workstation with single RTX 4090
