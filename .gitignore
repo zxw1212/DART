@@ -183,3 +183,6 @@ data/smplx_lockedhead_20230207/
 data/traj_test/
 data/*.json
 data/*.pkl
+data/amass/
+data/bones_studio/
+*.pdf

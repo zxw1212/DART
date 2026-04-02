@@ -31,6 +31,7 @@ from model.mld_vae import AutoMldVae
 from data_loaders.humanml.data.dataset import WeightedPrimitiveSequenceDataset, SinglePrimitiveDataset
 from utils.smpl_utils import *
 from utils.misc_util import encode_text, compose_texts_with_and
+from utils.smplx_stream import SmplxFrameStreamer
 from pytorch3d import transforms
 from diffusion import gaussian_diffusion as gd
 from diffusion.respace import SpacedDiffusion, space_timesteps
@@ -52,6 +53,7 @@ frame_idx = 0
 text_prompt = 'stand'
 text_embedding = None
 motion_tensor = None
+smplx_streamer = None
 
 @dataclass
 class RolloutArgs:
@@ -70,6 +72,11 @@ class RolloutArgs:
     export_smpl: int = 0
     zero_noise: int = 0
     use_predicted_joints: int = 0
+    stream_smplx: int = 0
+    disable_viewer: int = 0
+    stream_host: str = "127.0.0.1"
+    stream_port: int = 8765
+    stream_connect_timeout: float = 30.0
 
 
 class ClassifierFreeWrapper(nn.Module):
@@ -215,6 +222,11 @@ def read_input():
             break
 
 def get_body():
+    vertices, joints, faces, _ = get_body_state()
+    return vertices, joints, faces
+
+
+def get_body_state():
     motion_feature_dict = primitive_utility.tensor_to_dict(motion_tensor[:, frame_idx:frame_idx+1, :])
     transf_rotmat = torch.eye(3, device=device, dtype=torch.float32).unsqueeze(0).repeat(batch_size, 1, 1)
     transf_transl = torch.zeros(3, device=device, dtype=torch.float32).reshape(1, 1, 3).repeat(batch_size, 1, 1)
@@ -233,7 +245,31 @@ def get_body():
     output = body_model(return_verts=True, **smpl_dict)
     vertices = output.vertices[0].detach().cpu().numpy()
     joints = output.joints[0].detach().cpu().numpy()
-    return vertices, joints, body_model.faces
+    root_orient = transforms.matrix_to_axis_angle(
+        smpl_dict["global_orient"].detach().cpu().reshape(1, 3, 3)
+    ).reshape(-1)
+    pose_body = transforms.matrix_to_axis_angle(
+        smpl_dict["body_pose"].detach().cpu().reshape(-1, 3, 3)
+    ).reshape(-1)
+    stream_payload = {
+        "type": "frame",
+        "protocol_version": 1,
+        "payload_format": "smplx_params",
+        "frame_index": int(frame_idx),
+        "motion_fps": 30.0,
+        "actual_human_height": 1.8,
+        "surface_model_type": "smplx",
+        "mocap_frame_rate": 30.0,
+        "gender": gender,
+        "text_prompt": text_prompt,
+        "betas": smpl_dict["betas"].detach().cpu().numpy().reshape(-1).tolist(),
+        "num_betas": int(smpl_dict["betas"].numel()),
+        "root_orient": root_orient.numpy().tolist(),
+        "pose_body": pose_body.numpy().tolist(),
+        "trans": smpl_dict["transl"].detach().cpu().numpy().reshape(-1).tolist(),
+        "coord_transform": "none",
+    }
+    return vertices, joints, body_model.faces, stream_payload
 
 def generate():
     global frame_idx
@@ -245,55 +281,70 @@ def generate():
 
 
 def start():
-    scene = pyrender.Scene()
-    camera = pyrender.camera.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.414)
-    camera_pose = makeLookAt(position=camera_position, target=np.array([0.0, 0, 0]), up=up)
-    camera_node = pyrender.Node(camera=camera, name='camera', matrix=camera_pose)
-    scene.add_node(camera_node)
-    axis_node = pyrender.Node(mesh=pyrender.Mesh.from_trimesh(trimesh.creation.axis(), smooth=False), name='axis')
-    scene.add_node(axis_node)
-    vertices, joints, faces = get_body()
-    floor_height = vertices[:, 2].min()
-    floor = trimesh.creation.box(extents=np.array([50, 50, 0.01]),
-                                 transform=np.array([[1.0, 0.0, 0.0, 0],
-                                                     [0.0, 1.0, 0.0, 0],
-                                                     [0.0, 0.0, 1.0, floor_height - 0.005],
-                                                     [0.0, 0.0, 0.0, 1.0],
-                                                     ]),
-                                 )
-    floor.visual.vertex_colors = [0.8, 0.8, 0.8]
-    floor_node = pyrender.Node(mesh=pyrender.Mesh.from_trimesh(floor), name='floor')
-    scene.add_node(floor_node)
-    body_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-    body_node = pyrender.Node(mesh=pyrender.Mesh.from_trimesh(body_mesh, smooth=False), name='body')
-    scene.add_node(body_node)
-    viewer = pyrender.Viewer(scene, use_raymond_lighting=True, run_in_thread=True,
-                             viewport_size=(1920, 1920),
-                             record=False)
-    for _ in range(80):
-        print('*' * 20)
-    input("enter 'start' to start ?\n")
-    print('start')
+    viewer = None
+    scene = None
+    body_node = None
+
+    if smplx_streamer is not None:
+        print(f"Connecting SMPL-X stream to {rollout_args.stream_host}:{rollout_args.stream_port} ...")
+        smplx_streamer.connect()
+        print("SMPL-X stream connected.")
+
+    vertices, joints, faces, _ = get_body_state()
+    if not rollout_args.disable_viewer:
+        scene = pyrender.Scene()
+        camera = pyrender.camera.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.414)
+        camera_pose = makeLookAt(position=camera_position, target=np.array([0.0, 0, 0]), up=up)
+        camera_node = pyrender.Node(camera=camera, name='camera', matrix=camera_pose)
+        scene.add_node(camera_node)
+        axis_node = pyrender.Node(mesh=pyrender.Mesh.from_trimesh(trimesh.creation.axis(), smooth=False), name='axis')
+        scene.add_node(axis_node)
+        floor_height = vertices[:, 2].min()
+        floor = trimesh.creation.box(extents=np.array([50, 50, 0.01]),
+                                     transform=np.array([[1.0, 0.0, 0.0, 0],
+                                                         [0.0, 1.0, 0.0, 0],
+                                                         [0.0, 0.0, 1.0, floor_height - 0.005],
+                                                         [0.0, 0.0, 0.0, 1.0],
+                                                         ]),
+                                     )
+        floor.visual.vertex_colors = [0.8, 0.8, 0.8]
+        floor_node = pyrender.Node(mesh=pyrender.Mesh.from_trimesh(floor), name='floor')
+        scene.add_node(floor_node)
+        body_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
+        body_node = pyrender.Node(mesh=pyrender.Mesh.from_trimesh(body_mesh, smooth=False), name='body')
+        scene.add_node(body_node)
+        viewer = pyrender.Viewer(scene, use_raymond_lighting=True, run_in_thread=True,
+                                 viewport_size=(1920, 1920),
+                                 record=False)
+        for _ in range(80):
+            print('*' * 20)
+        input("enter 'start' to start ?\n")
+        print('start')
+    else:
+        print('start')
 
     input_thread = threading.Thread(target=read_input)
     input_thread.start()
     sleep_time = 1 / 30.0
     global frame_idx
     while True:
-        vertices, joints, faces = get_body()
-        body_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-        viewer.render_lock.acquire()
-        scene.remove_node(body_node)
-        body_node = pyrender.Node(mesh=pyrender.Mesh.from_trimesh(body_mesh, smooth=False), name='body')
-        scene.add_node(body_node)
-        camera_pose = makeLookAt(position=camera_position, target=joints[0], up=up)
-        camera_pose_current = viewer._camera_node.matrix
-        camera_pose_current[:, :] = camera_pose
-        viewer._trackball = Trackball(camera_pose_current, viewer.viewport_size, 1.0)
-        # not sure why _scale value of 1500.0 but panning is much smaller if not set to this ?!?
-        # your values may be different based on scale and world coordinates
-        viewer._trackball._scale = 1500.0
-        viewer.render_lock.release()
+        vertices, joints, faces, stream_payload = get_body_state()
+        if smplx_streamer is not None:
+            smplx_streamer.send(stream_payload)
+        if viewer is not None:
+            body_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
+            viewer.render_lock.acquire()
+            scene.remove_node(body_node)
+            body_node = pyrender.Node(mesh=pyrender.Mesh.from_trimesh(body_mesh, smooth=False), name='body')
+            scene.add_node(body_node)
+            camera_pose = makeLookAt(position=camera_position, target=joints[0], up=up)
+            camera_pose_current = viewer._camera_node.matrix
+            camera_pose_current[:, :] = camera_pose
+            viewer._trackball = Trackball(camera_pose_current, viewer.viewport_size, 1.0)
+            # not sure why _scale value of 1500.0 but panning is much smaller if not set to this ?!?
+            # your values may be different based on scale and world coordinates
+            viewer._trackball._scale = 1500.0
+            viewer.render_lock.release()
 
         frame_idx += 1
         if text_prompt.lower() == "exit":
@@ -302,7 +353,10 @@ def start():
             rollout(denoiser_args, denoiser_model, vae_args, vae_model, diffusion, dataset, rollout_args)
         time.sleep(sleep_time)
 
-    viewer.close_external()
+    if viewer is not None:
+        viewer.close_external()
+    if smplx_streamer is not None:
+        smplx_streamer.close()
     input_thread.join()
 
 if __name__ == '__main__':
@@ -361,8 +415,12 @@ if __name__ == '__main__':
     motion_tensor = dataset.denormalize(motion_tensor[:, :history_length, :])
     text_embedding = encode_text(dataset.clip_model, [text_prompt], force_empty_zero=True).to(dtype=torch.float32,
                                                                                               device=device)  # [1, 512]
+    if rollout_args.stream_smplx:
+        smplx_streamer = SmplxFrameStreamer(
+            host=rollout_args.stream_host,
+            port=rollout_args.stream_port,
+            connect_timeout=rollout_args.stream_connect_timeout,
+        )
 
     start()
-
-
 
