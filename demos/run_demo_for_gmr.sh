@@ -17,7 +17,7 @@ for model in "${model_list[@]}"; do
     --respacing "$respacing" \
     --use_predicted_joints $use_predicted_joints \
     --stream_smplx 1 \
-    --disable_viewer 0 \
+    --disable_viewer 1 \
     --stream_host "$stream_host" \
     --stream_port $stream_port
 done
