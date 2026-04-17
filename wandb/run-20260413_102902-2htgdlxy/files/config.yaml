@@ -1,0 +1,171 @@
+_wandb:
+    value:
+        cli_version: 0.24.2
+        code_path: source-mld_vae-None
+        e:
+            pt315dk6o8knjknkw5w12y8cdfgx6ige:
+                args:
+                    - --track
+                    - "1"
+                    - --wandb_entity
+                    - 1419739886-no
+                    - --exp_name
+                    - mvae_bones_seed
+                    - --data_args.dataset
+                    - mp_seq_v2
+                    - --data_args.data_dir
+                    - /media/zxw/WD_BLACK/bones_seed/seq_data_zero_male
+                    - --data_args.cfg_path
+                    - ./config_files/config_hydra/motion_primitive/mp_h2_f8_r8.yaml
+                    - --data_args.weight_scheme
+                    - uniform
+                    - --train_args.batch_size
+                    - "256"
+                    - --train_args.weight_kl
+                    - "1e-6"
+                    - --train_args.stage1_steps
+                    - "250000"
+                    - --train_args.stage2_steps
+                    - "125000"
+                    - --train_args.stage3_steps
+                    - "125000"
+                    - --train_args.save_interval
+                    - "100000"
+                    - --train_args.weight_smpl_joints_rec
+                    - "10.0"
+                    - --train_args.weight_joints_consistency
+                    - "10.0"
+                    - --train_args.weight_transl_delta
+                    - "100"
+                    - --train_args.weight_joints_delta
+                    - "100"
+                    - --train_args.weight_orient_delta
+                    - "100"
+                    - --model_args.arch
+                    - all_encoder
+                    - --train_args.ema_decay
+                    - "0.999"
+                    - --model_args.num_layers
+                    - "7"
+                    - --model_args.latent_dim
+                    - "1"
+                    - "256"
+                cpu_count: 14
+                cpu_count_logical: 20
+                cudaVersion: "12.2"
+                disk:
+                    /:
+                        total: "150051164160"
+                        used: "72458194944"
+                email: 1419739886@qq.com
+                executable: /home/zxw/software/DART/.venv/bin/python
+                git:
+                    commit: 428861bc094ac0bb732713fea30acf7192cf0fc2
+                    remote: https://github.com/zxw1212/DART.git
+                gpu: NVIDIA GeForce RTX 3090
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 10496
+                      memoryTotal: "25769803776"
+                      name: NVIDIA GeForce RTX 3090
+                      uuid: GPU-642cf47f-3fe5-8da3-5fca-07649a7f2884
+                host: zxw-pc
+                memory:
+                    total: "33409757184"
+                os: Linux-5.15.0-139-generic-x86_64-with-glibc2.29
+                program: -m mld.train_mvae
+                python: CPython 3.8.10
+                root: /home/zxw/software/DART
+                startedAt: "2026-04-13T02:29:02.985484Z"
+                writerId: pt315dk6o8knjknkw5w12y8cdfgx6ige
+        m: []
+        python_version: 3.8.10
+        t:
+            "1":
+                - 1
+                - 33
+                - 41
+            "2":
+                - 1
+                - 33
+                - 41
+            "3":
+                - 13
+                - 16
+                - 35
+            "4": 3.8.10
+            "5": 0.24.2
+            "12": 0.24.2
+            "13": linux-x86_64
+data_args:
+    value:
+        body_type: smplx
+        cfg_path: ./config_files/config_hydra/motion_primitive/mp_h2_f8_r8.yaml
+        data_dir: /media/zxw/WD_BLACK/bones_seed/seq_data_zero_male
+        dataset: mp_seq_v2
+        enforce_gender: male
+        enforce_zero_beta: 1
+        feature_dim: 276
+        future_length: 8
+        history_length: 2
+        num_primitive: 8
+        prob_static: 0
+        text_tolerance: 0
+        weight_scheme: uniform
+device:
+    value: cuda
+exp_name:
+    value: mvae_bones_seed
+model_args:
+    value:
+        activation: gelu
+        arch: all_encoder
+        dropout: 0.1
+        ff_size: 1024
+        h_dim: 256
+        latent_dim:
+            - 1
+            - 256
+        nfeats: 276
+        normalize_before: false
+        num_heads: 4
+        num_layers: 7
+        position_embedding: learned
+save_dir:
+    value: mvae/mvae_bones_seed
+seed:
+    value: 0
+torch_deterministic:
+    value: true
+track:
+    value: 1
+train_args:
+    value:
+        anneal_lr: 1
+        batch_size: 256
+        ema_decay: 0.999
+        grad_clip: 1
+        learning_rate: 0.0001
+        log_interval: 1000
+        resume_checkpoint: null
+        save_interval: 100000
+        stage1_steps: 250000
+        stage2_steps: 125000
+        stage3_steps: 125000
+        use_amp: 0
+        use_predicted_joints: 0
+        val_interval: 10000
+        weight_feature_rec: 0
+        weight_joints_consistency: 10
+        weight_joints_delta: 100
+        weight_kl: 1e-06
+        weight_latent_rec: 1
+        weight_orient_delta: 100
+        weight_rec: 1
+        weight_smpl_joints_rec: 10
+        weight_transl_delta: 100
+wandb_entity:
+    value: 1419739886-no
+wandb_project_name:
+    value: mld_vae

@@ -502,7 +502,15 @@ class Trainer:
             for primitive_idx in range(num_primitive):
                 with amp.autocast(enabled=bool(train_args.use_amp), dtype=torch.float16):
                     motion, cond = self.get_primitive_batch(batch, primitive_idx)
-                    loss_dict, future_motion_pred = self.common_step(motion, cond, last_primitive)
+                    try:
+                        loss_dict, future_motion_pred = self.common_step(motion, cond, last_primitive)
+                    except (IndexError, RuntimeError) as e:
+                        print(f"[WARNING] Skipping batch at step {self.step} due to error: {e}")
+                        last_primitive = None
+                        self.step += 1
+                        next(progress_bar)
+                        torch.cuda.empty_cache()
+                        continue
                     loss = loss_dict['loss']
 
                 # optimize

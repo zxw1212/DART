@@ -1,0 +1,26 @@
+_wandb:
+    value:
+        cli_version: 0.24.2
+        e:
+            atin9g4ivozkdc77t6locke0sdz0ao1b:
+                email: 1419739886@qq.com
+                executable: /home/zxw/software/DART/.venv/bin/python
+                git:
+                    commit: 428861bc094ac0bb732713fea30acf7192cf0fc2
+                    remote: https://github.com/zxw1212/DART.git
+                host: zxw-pc
+                os: Linux-5.15.0-139-generic-x86_64-with-glibc2.29
+                program: /home/zxw/test.py
+                python: CPython 3.8.10
+                root: /home/zxw/software/DART
+                startedAt: "2026-04-10T07:12:41.423100Z"
+                writerId: atin9g4ivozkdc77t6locke0sdz0ao1b
+        m: []
+        python_version: 3.8.10
+        t:
+            "3":
+                - 2
+            "4": 3.8.10
+            "5": 0.24.2
+            "12": 0.24.2
+            "13": linux-x86_64

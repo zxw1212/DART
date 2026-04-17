@@ -1,0 +1,15 @@
+{
+  "os": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+  "python": "CPython 3.8.10",
+  "startedAt": "2026-04-10T07:12:41.423100Z",
+  "program": "/home/zxw/test.py",
+  "git": {
+    "remote": "https://github.com/zxw1212/DART.git",
+    "commit": "428861bc094ac0bb732713fea30acf7192cf0fc2"
+  },
+  "email": "1419739886@qq.com",
+  "root": "/home/zxw/software/DART",
+  "host": "zxw-pc",
+  "executable": "/home/zxw/software/DART/.venv/bin/python",
+  "writerId": "atin9g4ivozkdc77t6locke0sdz0ao1b"
+}

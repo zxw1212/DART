@@ -384,7 +384,15 @@ class Trainer:
                     latent, dist = model.encode(future_motion=future_motion_gt, history_motion=history_motion)
                     future_motion_pred = model.decode(latent, history_motion, nfuture=future_length)  # [B, F, D]
 
-                    loss_dict = self.calc_loss(motion, cond, history_motion, future_motion_gt, future_motion_pred, latent, dist)
+                    try:
+                        loss_dict = self.calc_loss(motion, cond, history_motion, future_motion_gt, future_motion_pred, latent, dist)
+                    except (IndexError, RuntimeError) as e:
+                        print(f"[WARNING] Skipping batch at step {self.step} due to error: {e}")
+                        last_primitive = None
+                        self.step += 1
+                        next(progress_bar)
+                        torch.cuda.empty_cache()
+                        continue
                     loss = loss_dict['loss']
 
                 optimizer.zero_grad()

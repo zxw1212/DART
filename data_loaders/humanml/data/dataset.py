@@ -2118,8 +2118,12 @@ class WeightedPrimitiveSequenceDatasetV2(WeightedPrimitiveSequenceDataset):
         for key in self.text_embedding_dict:
             self.text_embedding_dict[key] = torch.from_numpy(self.text_embedding_dict[key]).to(dtype=torch.float32, device=self.device)
 
-    def calc_mean_std(self, batch_size=512):
-        all_mp_data = []
+    def calc_mean_std(self, batch_size=256):
+        # Online mean/std: accumulate sum and squared sum to avoid storing all data
+        running_sum = None
+        running_sq_sum = None
+        total_count = 0
+
         for seq_data in self.dataset:
             motion_data = seq_data['motion']
             num_frames = motion_data['transl'].shape[0]
@@ -2128,30 +2132,34 @@ class WeightedPrimitiveSequenceDatasetV2(WeightedPrimitiveSequenceDataset):
                 end_frame = start_frame + self.primitive_length
                 primitive_data_list.append(self.get_primitive(seq_data, start_frame, end_frame, skip_text=True))
 
-            primitive_dict = {'gender': primitive_data_list[0]['primitive_dict']['gender']}
-            for key in ['betas', 'transl', 'global_orient', 'body_pose', 'transf_rotmat', 'transf_transl', 'pelvis_delta', 'joints']:
-                primitive_dict[key] = torch.cat([data['primitive_dict'][key] for data in primitive_data_list], dim=0)
-            primitive_dict = tensor_dict_to_device(primitive_dict, self.device)
+            for batch_start_idx in range(0, len(primitive_data_list), batch_size):
+                batch_end_idx = min(batch_start_idx + batch_size, len(primitive_data_list))
+                batch_list = primitive_data_list[batch_start_idx:batch_end_idx]
+                primitive_dict = {'gender': batch_list[0]['primitive_dict']['gender']}
+                for key in ['betas', 'transl', 'global_orient', 'body_pose', 'transf_rotmat', 'transf_transl', 'pelvis_delta', 'joints']:
+                    primitive_dict[key] = torch.cat([data['primitive_dict'][key] for data in batch_list], dim=0)
+                primitive_dict = tensor_dict_to_device(primitive_dict, self.device)
 
-            # split primitive_dict into batches
-            batch_start_idx = 0
-            while batch_start_idx < len(primitive_dict['transl']):
-                batch_end_idx = min(batch_start_idx + batch_size, len(primitive_dict['transl']))
-                batch_primitive_dict = {key: primitive_dict[key][batch_start_idx:batch_end_idx] for key in ['betas', 'transl', 'global_orient', 'body_pose', 'transf_rotmat', 'transf_transl', 'pelvis_delta', 'joints']}
-                batch_primitive_dict['gender'] = primitive_dict['gender']
-                _, _, canonicalized_primitive_dict = self.primitive_utility.canonicalize(batch_primitive_dict, use_predicted_joints=True)
+                _, _, canonicalized_primitive_dict = self.primitive_utility.canonicalize(primitive_dict, use_predicted_joints=True)
                 feature_dict = self.primitive_utility.calc_features(canonicalized_primitive_dict, use_predicted_joints=True)
-                feature_dict['transl'] = feature_dict['transl'][:, :-1, :]  # [num_primitive, T, 3]
-                feature_dict['poses_6d'] = feature_dict['poses_6d'][:, :-1, :]  # [num_primitive, T, 66]
-                feature_dict['joints'] = feature_dict['joints'][:, :-1, :]  # [num_primitive, T, 22 * 3]
-                motion_tensor = self.dict_to_tensor(feature_dict)  # [num_primitive, T, D]
-                all_mp_data.append(motion_tensor)
+                feature_dict['transl'] = feature_dict['transl'][:, :-1, :]
+                feature_dict['poses_6d'] = feature_dict['poses_6d'][:, :-1, :]
+                feature_dict['joints'] = feature_dict['joints'][:, :-1, :]
+                motion_tensor = self.dict_to_tensor(feature_dict).detach().cpu()  # [B, T, D]
 
-                batch_start_idx = batch_end_idx
+                B, T, D = motion_tensor.shape
+                flat = motion_tensor.reshape(-1, D).double()
+                if running_sum is None:
+                    running_sum = flat.sum(dim=0)
+                    running_sq_sum = (flat ** 2).sum(dim=0)
+                else:
+                    running_sum += flat.sum(dim=0)
+                    running_sq_sum += (flat ** 2).sum(dim=0)
+                total_count += B * T
+                del primitive_dict, canonicalized_primitive_dict, feature_dict, motion_tensor, flat
 
-        all_mp_data = torch.cat(all_mp_data, dim=0)  # [N, T, D]
-        tensor_mean = all_mp_data.mean(dim=[0, 1], keepdim=True)  # [1, 1, D]
-        tensor_std = all_mp_data.std(dim=[0, 1], keepdim=True)  # [1, 1, D]
+        tensor_mean = (running_sum / total_count).float().reshape(1, 1, -1)
+        tensor_std = ((running_sq_sum / total_count - (running_sum / total_count) ** 2).clamp(min=1e-12).sqrt()).float().reshape(1, 1, -1)
         return tensor_mean, tensor_std
 
     def get_primitive(self, seq_data, start_frame, end_frame, skip_text=False):
